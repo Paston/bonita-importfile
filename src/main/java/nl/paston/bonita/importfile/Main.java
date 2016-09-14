@@ -157,6 +157,10 @@ public class Main {
 
     protected static Map<Object, Object> parseRecord(CSVRecord record,
             CSVRecord fullHeader) {
+        if (record == null) {
+            log.warn("Record is null.");
+            return null;
+        }
         log.info("Parsing record number: " + (record.getRecordNumber() - 1));
         log.debug(" with content: " + record.toString());
         final Map<Object, Object> map = new HashMap<>();
@@ -177,6 +181,10 @@ public class Main {
     protected static void pushRecordToBonita(ProcessAPI processAPI,
             ProcessDeploymentInfo info, String bonitaInputVar,
             Map<Object, Object> map) {
+        if (map == null) {
+            log.warn("map is null.");
+            return;
+        }
         log.info("Pushing record to Bonita server.");
         log.debug(map.toString());
         try {
@@ -258,6 +266,10 @@ public class Main {
     }
 
     protected static CSVRecord getFullHeader(Iterator<CSVRecord> iterator) {
+        if (iterator == null) {
+            log.warn("iterator is null.");
+            return null;
+        }
         if (iterator.hasNext()) {
             return iterator.next();
         } else {
@@ -268,6 +280,10 @@ public class Main {
     }
 
     protected static Iterable<CSVRecord> getCSVRecords(Reader in) {
+        if (in == null) {
+            log.warn("in is null.");
+            return null;
+        }
         try {
             return CSVFormat.EXCEL.parse(in);
         } catch (IOException ex) {
@@ -279,6 +295,10 @@ public class Main {
 
     protected static Reader getReader(CommandLine cmd) {
         log.debug("Reading CSV file.");
+        if (cmd == null) {
+            log.warn("cmd is null.");
+            return null;
+        }
         while (true) {
             String fileName = cmd.hasOption(Cmd.CSV_FILE.getName())
                     ? cmd.getOptionValue(Cmd.CSV_FILE.getName())
@@ -299,6 +319,10 @@ public class Main {
     protected static ProcessDeploymentInfo getSelectedProcess(
             List<ProcessDeploymentInfo> processList,
             CommandLine cmd) {
+        if (cmd == null) {
+            log.warn("cmd is null.");
+            return null;
+        }
         if (cmd.hasOption(Cmd.PROCESS_NAME.getName())
                 && cmd.hasOption(Cmd.PROCESS_VERSION.getName())) {
             for (ProcessDeploymentInfo process : processList) {
@@ -332,9 +356,12 @@ public class Main {
                         Order.DESC)
                 .done();
         try {
-            List<ProcessDeploymentInfo> deploymentInfoResults
-                    = processAPI.searchProcessDeploymentInfos(
-                            searchOptions).getResult();
+            List<ProcessDeploymentInfo> deploymentInfoResults = null;
+            if (processAPI != null) {
+                deploymentInfoResults
+                        = processAPI.searchProcessDeploymentInfos(
+                                searchOptions).getResult();
+            }
             log.debug("Successfully retrieved process list.");
             return deploymentInfoResults;
         } catch (SearchException ex) {
@@ -361,6 +388,10 @@ public class Main {
 
     protected static APISession getAPISession(LoginAPI loginAPI,
             String userName, char[] password) {
+        if (loginAPI == null) {
+            log.warn("loginAPI is null.");
+            return null;
+        }
         log.debug("Logging into the bonita server.");
         try {
             APISession apiSession = loginAPI.login(userName,
@@ -400,6 +431,10 @@ public class Main {
 
     protected static String getConsoleInput(String displayText,
             String defaultValue, CommandLine cmd, String optionName) {
+        if (cmd == null) {
+            log.warn("cmd is null.");
+            return null;
+        }
         if (cmd != null && cmd.hasOption(optionName)) {
             return cmd.getOptionValue(optionName);
         } else {
@@ -460,7 +495,7 @@ public class Main {
         }
     }
 
-    private static CommandLine parseArguments(String[] args) {
+    protected static CommandLine parseArguments(String[] args) {
         Options options = new Options();
 
         Option serverUrl = new Option("s", Cmd.SERVER_URL.getName(),
