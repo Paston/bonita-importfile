@@ -31,6 +31,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.ResourceBundle;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.cli.CommandLine;
@@ -72,10 +73,17 @@ import org.slf4j.impl.SimpleLogger;
 public class Main {
 
     private static Logger log;
+    
+    private static final ResourceBundle BUNDLE 
+            = ResourceBundle.getBundle("language");
 
     private static final int NUMBER_OF_PROCESSES = 20;
     private static final String TRUE = "TRUE";
     private static final String FALSE = "FALSE";
+    
+    private static final String DEFAULT_URL = "http://localhost:8080";
+    private static final String DEFAULT_APPLICATION = "bonita";
+    private static final String DEFAULT_USER = "walter.bates";
 
     protected static enum Cmd {
         SERVER_URL("serverUrl"),
@@ -109,17 +117,17 @@ public class Main {
 
         // Get input paramters for Login API
         String serverUrl = getConsoleInput("Bonita server URL",
-                "http://localhost:8080", cmd, Cmd.SERVER_URL.getName());
+                DEFAULT_URL, cmd, Cmd.SERVER_URL.getName());
 
         String applicationName = getConsoleInput("Bonita application name",
-                "bonita", cmd, Cmd.APPLICATION_NAME.getName());
+                DEFAULT_APPLICATION, cmd, Cmd.APPLICATION_NAME.getName());
 
         // Connect to Bonita server and create the Login API.
         LoginAPI loginAPI = getLoginAPI(serverUrl, applicationName);
 
         // Get login parameters for APISession
         String userName = getConsoleInput("Bonita user name",
-                "walter.bates", cmd, Cmd.USERNAME.getName());
+                DEFAULT_USER, cmd, Cmd.USERNAME.getName());
 
         char[] password = cmd.hasOption(Cmd.PASSWORD.getName())
                 ? cmd.getOptionValue(Cmd.PASSWORD.getName()).toCharArray()
