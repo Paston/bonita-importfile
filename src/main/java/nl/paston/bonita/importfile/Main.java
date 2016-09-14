@@ -24,9 +24,11 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.Serializable;
+import java.lang.reflect.UndeclaredThrowableException;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -42,6 +44,7 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
+import org.apache.http.conn.HttpHostConnectException;
 import org.bonitasoft.engine.api.ApiAccessType;
 import org.bonitasoft.engine.api.LoginAPI;
 import org.bonitasoft.engine.api.ProcessAPI;
@@ -73,15 +76,13 @@ import org.slf4j.impl.SimpleLogger;
 public class Main {
 
     private static Logger log;
-    
-    private static final ResourceBundle BUNDLE 
-            = ResourceBundle.getBundle("language");
+
+    private static final ResourceBundle BUNDLE
+            = ResourceBundle.getBundle("bonita-importfile");
 
     private static final int NUMBER_OF_PROCESSES = 20;
-    private static final String TRUE = "TRUE";
-    private static final String FALSE = "FALSE";
-    
-    private static final String DEFAULT_URL = "http://localhost:8080";
+
+    private static final String DEFAULT_URL = BUNDLE.getString("default.url");
     private static final String DEFAULT_APPLICATION = "bonita";
     private static final String DEFAULT_USER = "walter.bates";
 
@@ -218,16 +219,17 @@ public class Main {
         }
         switch (headerType) {
             case "BOOLEAN":
-                switch (stringValue) {
-                    case TRUE:
-                        return true;
-                    case FALSE:
-                        return false;
-                    default:
-                        log.warn("This is not a boolean ("
-                                + TRUE + "," + FALSE + "): " + stringValue);
-                        return null;
+                String trueValue = BUNDLE.getString("excel.true");
+                if (stringValue.equals(trueValue)) {
+                    return true;
                 }
+                String falseValue = BUNDLE.getString("excel.false");
+                if (stringValue.equals(falseValue)) {
+                    return false;
+                }
+                log.warn("This is not a boolean ("
+                        + trueValue + "," + falseValue + "): " + stringValue);
+                return null;
             case "DATE":
                 try {
                     DateFormat df = new SimpleDateFormat("dd/mm/yyyy");
@@ -303,11 +305,7 @@ public class Main {
 
     protected static Reader getReader(CommandLine cmd) {
         log.debug("Reading CSV file.");
-        if (cmd == null) {
-            log.warn("cmd is null.");
-            return null;
-        }
-        while (true) {
+        while (cmd != null) {
             String fileName = cmd.hasOption(Cmd.CSV_FILE.getName())
                     ? cmd.getOptionValue(Cmd.CSV_FILE.getName())
                     : System.console().readLine("Name of the CSV File to read: ");
@@ -322,16 +320,13 @@ public class Main {
                 System.exit(1);
             }
         }
+        return null;
     }
 
     protected static ProcessDeploymentInfo getSelectedProcess(
             List<ProcessDeploymentInfo> processList,
             CommandLine cmd) {
-        if (cmd == null) {
-            log.warn("cmd is null.");
-            return null;
-        }
-        if (cmd.hasOption(Cmd.PROCESS_NAME.getName())
+        if (cmd != null && cmd.hasOption(Cmd.PROCESS_NAME.getName())
                 && cmd.hasOption(Cmd.PROCESS_VERSION.getName())) {
             for (ProcessDeploymentInfo process : processList) {
                 if (process.getName().equals(
@@ -342,17 +337,19 @@ public class Main {
                 }
             }
         }
-
-        for (int i = 0; i < processList.size(); i++) {
-            log.info(i + 1 + ". " + processList.get(i).getName()
-                    + " (" + processList.get(i).getVersion() + ")");
+        if (processList != null) {
+            for (int i = 0; i < processList.size(); i++) {
+                log.info(i + 1 + ". " + processList.get(i).getName()
+                        + " (" + processList.get(i).getVersion() + ")");
+            }
+            int processId = 0;
+            do {
+                processId = tryParse(getConsoleInput("Select process",
+                        Integer.toString(processId + 1))) - 1;
+            } while (processId < 0 || processId >= processList.size());
+            return processList.get(processId);
         }
-        int processId = 0;
-        do {
-            processId = tryParse(getConsoleInput("Select process",
-                    Integer.toString(processId + 1))) - 1;
-        } while (processId < 0 || processId >= processList.size());
-        return processList.get(processId);
+        return null;
     }
 
     protected static List<ProcessDeploymentInfo> getProcessList(
@@ -396,6 +393,7 @@ public class Main {
 
     protected static APISession getAPISession(LoginAPI loginAPI,
             String userName, char[] password) {
+        log.info("Logging into server.");
         if (loginAPI == null) {
             log.warn("loginAPI is null.");
             return null;
@@ -407,7 +405,12 @@ public class Main {
             log.info("Succesfully logged into server.");
             return apiSession;
         } catch (LoginException ex) {
-            log.error("Cannot loging with credentials");
+            log.error("Cannot loging with credentials.");
+            log.debug("Stacktrace", ex);
+            System.exit(1);
+        } catch (UndeclaredThrowableException ex) {
+            log.error("Cannot connect to the server.");
+            log.debug("Stacktrace", ex);
             System.exit(1);
         }
         return null;
@@ -415,18 +418,19 @@ public class Main {
 
     protected static LoginAPI getLoginAPI(String serverUrl,
             String applicationName) {
-        log.debug("Connecting to server.");
+        log.debug("Creating LoginAPI.");
         Map<String, String> settings = new HashMap<>();
         settings.put("server.url", serverUrl);
         settings.put("application.name", applicationName);
         APITypeManager.setAPITypeAndParams(ApiAccessType.HTTP, settings);
         try {
             LoginAPI loginAPI = TenantAPIAccessor.getLoginAPI();
-            log.info("Succesfully connected to server.");
+            log.debug("Succesfully created LoginAPI.");
             return loginAPI;
         } catch (BonitaHomeNotSetException | ServerAPIException |
                 UnknownAPITypeException ex) {
             log.error("Error creating the Login API");
+            log.debug("Stacktrace", ex);
             System.exit(1);
         }
         return null;
@@ -439,22 +443,23 @@ public class Main {
 
     protected static String getConsoleInput(String displayText,
             String defaultValue, CommandLine cmd, String optionName) {
-        if (cmd == null) {
-            log.warn("cmd is null.");
-            return null;
-        }
         if (cmd != null && cmd.hasOption(optionName)) {
             return cmd.getOptionValue(optionName);
         } else {
             Console console = System.console();
-            String consoleInput = console.readLine(displayText
-                    + " (" + defaultValue + "): ");
-            if (!consoleInput.trim().isEmpty()) {
-                return consoleInput.trim();
-            } else {
-                return defaultValue;
+            String consoleInput = null;
+            if (console != null) {
+                consoleInput = console.readLine(displayText
+                        + " (" + defaultValue + "): ");
+
+                if (!consoleInput.trim().isEmpty()) {
+                    return consoleInput.trim();
+                } else {
+                    return defaultValue;
+                }
             }
         }
+        return defaultValue;
     }
 
     protected static int tryParse(Object obj) {
