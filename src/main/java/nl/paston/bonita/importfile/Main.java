@@ -28,7 +28,6 @@ import java.lang.reflect.UndeclaredThrowableException;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -44,7 +43,6 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
-import org.apache.http.conn.HttpHostConnectException;
 import org.bonitasoft.engine.api.ApiAccessType;
 import org.bonitasoft.engine.api.LoginAPI;
 import org.bonitasoft.engine.api.ProcessAPI;
@@ -142,7 +140,7 @@ public class Main {
         List<ProcessDeploymentInfo> processList = getProcessList(processAPI);
 
         ProcessDeploymentInfo processDeploymentInfo
-                = getSelectedProcess(processList, cmd);
+                = getProcess(processList, cmd);
 
         // Ge the bonita input variable for this process.
         String bonitaInputVar = cmd.hasOption(Cmd.INPUT_VARIABLE.getName())
@@ -323,7 +321,7 @@ public class Main {
         return null;
     }
 
-    protected static ProcessDeploymentInfo getSelectedProcess(
+    protected static ProcessDeploymentInfo getProcess(
             List<ProcessDeploymentInfo> processList,
             CommandLine cmd) {
         if (cmd != null && cmd.hasOption(Cmd.PROCESS_NAME.getName())
@@ -339,7 +337,7 @@ public class Main {
         }
         if (processList != null) {
             for (int i = 0; i < processList.size(); i++) {
-                log.info(i + 1 + ". " + processList.get(i).getName()
+                System.out.println(i + 1 + ". " + processList.get(i).getName()
                         + " (" + processList.get(i).getVersion() + ")");
             }
             int processId = 0;
