@@ -1,0 +1,4 @@
+request.car.model (STRING),request.car.make (STRING),request.person.lastname (STRING),other.person.birthdate (DATE),other.person.length (INTEGER)
+BMW,7 series,Doe,31/12/1980,170
+Tesla,Model S,Smith,1/1/1975,172
+Volvo,C40,Johnson,13/11/1982,189

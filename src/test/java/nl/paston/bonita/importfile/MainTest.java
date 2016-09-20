@@ -16,6 +16,8 @@
 package nl.paston.bonita.importfile;
 
 import java.io.Reader;
+import java.io.Serializable;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -47,18 +49,18 @@ public class MainTest {
     
     @Test
     public void testGetHeader() {
-        Assert.assertEquals("polKey", Main.getHeader(fullHeaderValue1));
-        Assert.assertEquals("polKey", Main.getHeader(fullHeaderValue2));
-        Assert.assertEquals("polKey", Main.getHeader(fullHeaderValue3));
-        Assert.assertEquals("polKey", Main.getHeader(fullHeaderValue4));
+        Assert.assertEquals("polKey", Main.getHeaderField(fullHeaderValue1));
+        Assert.assertEquals("polKey", Main.getHeaderField(fullHeaderValue2));
+        Assert.assertEquals("polKey", Main.getHeaderField(fullHeaderValue3));
+        Assert.assertEquals("polKey", Main.getHeaderField(fullHeaderValue4));
     }
 
     @Test
     public void testGetHeaderType() {
-        Assert.assertEquals("STRING", Main.getHeaderType(fullHeaderValue1));
-        Assert.assertEquals("STRING", Main.getHeaderType(fullHeaderValue2));
-        Assert.assertEquals("STRING", Main.getHeaderType(fullHeaderValue3));
-        Assert.assertEquals("STRING", Main.getHeaderType(fullHeaderValue4));
+        Assert.assertEquals("STRING", Main.getHeaderFieldType(fullHeaderValue1));
+        Assert.assertEquals("STRING", Main.getHeaderFieldType(fullHeaderValue2));
+        Assert.assertEquals("STRING", Main.getHeaderFieldType(fullHeaderValue3));
+        Assert.assertEquals("STRING", Main.getHeaderFieldType(fullHeaderValue4));
     }
 
     @Test
@@ -67,7 +69,7 @@ public class MainTest {
         CSVRecord record = null;
         CSVRecord fullHeader = null;
         Map<Object, Object> expResult = null;
-        Map<Object, Object> result = Main.parseRecord(record, fullHeader);
+        Map<String, Serializable> result = Main.parseRecord(record, fullHeader);
     }
 
     @Test
@@ -75,9 +77,8 @@ public class MainTest {
         System.out.println("pushRecordToBonita");
         ProcessAPI processAPI = null;
         ProcessDeploymentInfo info = null;
-        String bonitaInputVar = "";
         Map<Object, Object> map = null;
-        Main.pushRecordToBonita(processAPI, info, bonitaInputVar, map);
+        Main.pushRecordToBonita(processAPI, info, (HashMap)map);
     }
 
     @Test
@@ -86,7 +87,7 @@ public class MainTest {
         String headerType = "";
         String stringValue = "";
         Object expResult = null;
-        Object result = Main.getRecordObject(headerType, stringValue);
+        Object result = Main.getRecordField(headerType, stringValue);
     }
 
     @Test

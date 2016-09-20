@@ -28,6 +28,7 @@ import java.lang.reflect.UndeclaredThrowableException;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -142,11 +143,6 @@ public class Main {
         ProcessDeploymentInfo processDeploymentInfo
                 = getProcess(processList, cmd);
 
-        // Ge the bonita input variable for this process.
-        String bonitaInputVar = cmd.hasOption(Cmd.INPUT_VARIABLE.getName())
-                ? cmd.getOptionValue(Cmd.INPUT_VARIABLE.getName())
-                : System.console().readLine("Bonita input variable name: ");
-
         // Read records from file;
         Reader in = getReader(cmd);
         Iterable<CSVRecord> records = getCSVRecords(in);
@@ -155,28 +151,65 @@ public class Main {
         Iterator<CSVRecord> iterator = records.iterator();
         CSVRecord fullHeader = getFullHeader(iterator);
         for (CSVRecord record : records) {
-            Map<Object, Object> map = parseRecord(record, fullHeader);
+            Map<String, Serializable> map = parseRecord(record, fullHeader);
             pushRecordToBonita(processAPI,
-                    processDeploymentInfo, bonitaInputVar, map);
+                    processDeploymentInfo, map);
         }
         log.info("Finished bonita-importfile succesfully.");
     }
 
-    protected static Map<Object, Object> parseRecord(CSVRecord record,
-            CSVRecord fullHeader) {
+    protected static Map<String, Serializable> parseRecord(CSVRecord record, CSVRecord fullHeader) {
         if (record == null) {
             log.warn("Record is null.");
             return null;
         }
         log.info("Parsing record number: " + (record.getRecordNumber() - 1));
         log.debug(" with content: " + record.toString());
-        final Map<Object, Object> map = new HashMap<>();
+        final Map<String, Serializable> map = new HashMap<>();
         for (int i = 0; i < record.size(); i++) {
-            String header = getHeader(fullHeader.get(i));
-            String headerType = getHeaderType(fullHeader.get(i));
-            Object recordObject = getRecordObject(headerType, record.get(i));
-            if (recordObject != null) {
-                map.put(header, recordObject);
+            String headerFieldType = getHeaderFieldType(fullHeader.get(i));
+            Object recordField = getRecordField(headerFieldType, record.get(i));
+            if (recordField != null) {
+                String headerField = getHeaderField(fullHeader.get(i));
+                String[] headerFieldParts = headerField.split("\\.");
+                Map<String, Serializable> targetMap = map;
+                for (int j = 0; j < headerFieldParts.length - 1; j++) {
+                    try {
+                        targetMap = (Map<String, Serializable>) targetMap.computeIfAbsent(headerFieldParts[j], x -> new HashMap<>());
+                    } catch (ClassCastException ex) {
+                        log.debug("Problem parsing: " + headerFieldParts[j]);
+                    }
+                }
+                String currentHeaderField = headerFieldParts[headerFieldParts.length - 1];
+                Matcher listMatcher = Pattern.compile("\\[(.*)\\]").matcher(currentHeaderField);
+                if (listMatcher.find()) {
+                    String parametersString = listMatcher.group(1);
+                    Matcher chfNameMatcher = Pattern.compile("(.*)\\[").matcher(currentHeaderField);
+                    if (chfNameMatcher.find()) {
+                        String chfName = chfNameMatcher.group(1);
+                        String[] parameters = parametersString.split("&");
+                        List<Serializable> list = (List<Serializable>) targetMap.computeIfAbsent(chfName, x -> new ArrayList<>());
+                        if (parametersString.isEmpty()) {
+                            list.add((Serializable) recordField);
+                        } else {
+                            Map<String, Serializable> subMap = new HashMap<>();
+                            for (String parameter : parameters) {
+                                String[] parameterKeys = parameter.split("=");
+                                if (parameterKeys.length == 2) {
+                                    subMap.put(parameterKeys[0], parameterKeys[1]);
+                                } else if (parameterKeys.length == 1) {
+                                    subMap.put(parameterKeys[0], (Serializable) recordField);
+                                } else {
+                                    log.error("Wrong number of parameters for: " + currentHeaderField);
+                                    System.exit(1);
+                                }
+                            }
+                            list.add((Serializable) subMap);
+                        }
+                    }
+                } else {
+                    targetMap.put(currentHeaderField, (Serializable) recordField);
+                }
             } else {
                 log.warn("Skipped value for record item: "
                         + record.get(i));
@@ -186,8 +219,7 @@ public class Main {
     }
 
     protected static void pushRecordToBonita(ProcessAPI processAPI,
-            ProcessDeploymentInfo info, String bonitaInputVar,
-            Map<Object, Object> map) {
+            ProcessDeploymentInfo info, Map<String, Serializable> map) {
         if (map == null) {
             log.warn("map is null.");
             return;
@@ -195,9 +227,7 @@ public class Main {
         log.info("Pushing record to Bonita server.");
         log.debug(map.toString());
         try {
-            final Map<String, Serializable> inputs = new HashMap<>();
-            inputs.put(bonitaInputVar, new HashMap(map));
-            processAPI.startProcessWithInputs(info.getProcessId(), inputs);
+            processAPI.startProcessWithInputs(info.getProcessId(), map);
             log.debug("Succesfully pushed record.");
         } catch (ProcessDefinitionNotFoundException |
                 ProcessActivationException |
@@ -209,7 +239,7 @@ public class Main {
         }
     }
 
-    protected static Object getRecordObject(String headerType,
+    protected static Object getRecordField(String headerType,
             String stringValue) {
         if (headerType == null) {
             log.warn("Cannot parse an based on an empty headertype.");
@@ -230,7 +260,7 @@ public class Main {
                 return null;
             case "DATE":
                 try {
-                    DateFormat df = new SimpleDateFormat("dd/mm/yyyy");
+                    DateFormat df = new SimpleDateFormat("yyyy/MM/dd");
                     return df.parse(stringValue);
                 } catch (ParseException ex) {
                     log.warn("This is not a date: " + stringValue);
@@ -470,7 +500,7 @@ public class Main {
         return retVal;
     }
 
-    protected static String getHeader(String fullHeaderValue) {
+    protected static String getHeaderField(String fullHeaderValue) {
         if (fullHeaderValue != null && !fullHeaderValue.isEmpty()) {
             Matcher matcher = Pattern.compile("(.*?)[\\s\\(]")
                     .matcher(fullHeaderValue);
@@ -488,7 +518,7 @@ public class Main {
         }
     }
 
-    protected static String getHeaderType(String fullHeaderValue) {
+    protected static String getHeaderFieldType(String fullHeaderValue) {
         if (fullHeaderValue != null && !fullHeaderValue.isEmpty()) {
             Matcher matcher = Pattern.compile("\\((.*?)\\)")
                     .matcher(fullHeaderValue);
@@ -532,10 +562,6 @@ public class Main {
         Option procesVersion = new Option("v", Cmd.PROCESS_VERSION.getName(),
                 true, "Version of the Bonita BPM Process");
         options.addOption(procesVersion);
-
-        Option inputVariable = new Option("i", Cmd.INPUT_VARIABLE.getName(),
-                true, "Input variable neede to start Bonita BPM Process.");
-        options.addOption(inputVariable);
 
         Option csvFilename = new Option("c", Cmd.CSV_FILE.getName(),
                 true, "Filename of the CSV file.");
